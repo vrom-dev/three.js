@@ -2,51 +2,79 @@ import * as THREE from 'three'
 import { STLLoader } from './node_modules/three/examples/jsm/loaders/STLLoader.js'
 import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js'
 
-let scene, camera, renderer, control, object
+const canvasContainer = document.querySelector('.container')
+const width = canvasContainer.offsetWidth
+const height = canvasContainer.offsetHeight
+const minSize = width > height ? height : width
 
-function init () {
-  scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x444444)
+const scene = new THREE.Scene()
+scene.background = new THREE.Color(0xefefef)
+scene.fog = new THREE.Fog(0xefefef, 1, 500)
 
-  renderer = new THREE.WebGLRenderer()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  document.body.appendChild(renderer.domElement)
-  scene.add(object)
+const camera = new THREE.PerspectiveCamera(
+  75,
+  minSize / minSize,
+  0.1,
+  10000
+)
 
-  control = new OrbitControls(camera, renderer.domElement)
-  const light = new THREE.DirectionalLight(0xffeeee)
-  light.position.set(0, 10, 10)
-  scene.add(light)
+const renderer = new THREE.WebGLRenderer({
+  canvas: document.getElementById('app'),
+  antialias: true
+})
+renderer.setSize(minSize, minSize)
+renderer.setPixelRatio(window.devicePixelRatio)
 
-  const light2 = new THREE.DirectionalLight(0xffeeee)
-  light2.position.set(0, 10, -10)
-  scene.add(light2)
+window.addEventListener('resize', () => {
+  const canvasContainer = document.querySelector('.container')
+  const width = canvasContainer.offsetWidth
+  const height = canvasContainer.offsetHeight
+  const minSize = width > height ? height : width
+  camera.aspect = minSize / minSize
+  renderer.setSize(minSize, minSize)
+})
 
-  renderer.render(scene, camera)
-}
+// ADD Lights
+const frontLight = new THREE.DirectionalLight(0xffeedf)
+frontLight.position.set(0, 1, 1)
 
-function animate () {
-  requestAnimationFrame(animate)
-  renderer.render(scene, camera)
-}
+const backLight = new THREE.DirectionalLight(0xffeedf)
+backLight.position.set(0, 1, -1)
 
-const loader = new STLLoader()
+const stlLoader = new STLLoader()
 
-loader.load('./public/3dmodels/mando.stl', (geometry) => {
+const stls = [
+  './3dmodels/byoda.stl',
+  './3dmodels/mando.stl'
+]
+
+stlLoader.load(stls[1], (geometry) => {
   geometry.center()
-  object = new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     geometry,
-    new THREE.MeshLambertMaterial({ color: 0x44bbff })
+    new THREE.MeshLambertMaterial({ color: 0xffeeee })
   )
 
-  camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    10000
-  )
-  camera.position.z = geometry.boundingBox.min.z + 300
-  object.rotation.x = -Math.PI / 2
-  init()
+  geometry.computeBoundingSphere() // We need to computeBoundingSphere or it is null by default
+  camera.position.z = geometry.boundingSphere.radius * 1.7 // We double the boundingSphere radius
+  camera.position.y = 10
+  const control = new OrbitControls(camera, renderer.domElement)
+
+  mesh.rotation.x = -Math.PI / 2
+  // const floor = new THREE.Mesh(
+  //   new THREE.PlaneGeometry(geometry.boundingSphere.radius * 100, geometry.boundingSphere.radius * 100, geometry.boundingSphere.radius * 10, geometry.boundingSphere.radius * 10),
+  //   new THREE.MeshBasicMaterial({ color: 0x222222, wireframe: false })
+  // )
+  // floor.rotation.x = -Math.PI / 2
+  // floor.position.y = geometry.boundingBox.min.y - geometry.boundingSphere.radius / 2
+  scene.add(mesh, frontLight, backLight)
+  const grid = new THREE.GridHelper(10000, 1000)
+  grid.position.z = -geometry.boundingSphere.radius * 1.7
+  scene.add(grid)
   animate()
 })
+
+function animate () {
+  window.requestAnimationFrame(animate)
+  renderer.render(scene, camera)
+}
